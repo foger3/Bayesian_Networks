@@ -4,6 +4,7 @@ import copy
 import pandas as pd
 import itertools
 import numpy as np
+from itertools import combinations
 
 class BNReasoner:
     def __init__(self, net: Union[str, BayesNet]):
@@ -41,15 +42,21 @@ class BNReasoner:
             Z = [Z]
         
         variables = X + Y + Z
+        ## print(variables)
         
         # 1. Delete every leaf nodes : that don't have children        
         self.del_leaf_nodes(variables)
         
         # 2. Delete all edges outgoing from Z
         ## find children
-        for evidence in Z :            
+        for evidence in Z :
+            ## print('evidence', evidence)
+            
             successors = self.bn.structure.successors(evidence)
             for successor in [c for c in successors]:
+                ## print('successor', successor)
+                
+                print(evidence, successor)
                 self.bn.del_edge((evidence, successor))
             
         self.del_leaf_nodes(variables)
@@ -67,8 +74,9 @@ class BNReasoner:
         ancestors = set() ## observed nodes and their ancestors
 
         while len(visit_nodes) > 0:
+            ## print('visited nodes', visit_nodes)
             next_node = visit_nodes.pop() 
-            
+            ## print('next node', next_node)
             ## add parents
             for parent in self.bn.structure.predecessors(next_node):
                 ancestors.add(parent)
@@ -171,49 +179,67 @@ class BNReasoner:
         n_assignments = len(marginalized_cpt)
         n_rows_cpt = len(factor)
         
+        print(marginalized_cpt)
         # get values of the first row
         cps =[]
         
         # sum conditional probability for same assignments
         for i in range(n_assignments):
             ass = [val for val in marginalized_cpt.iloc[i]]
+            print('Assignment', ass)
             
             p = 0
             for j in range(n_rows_cpt):
                 row_to_check = [val for val in cpt_ext_f.iloc[j]]
+                print('cpt row', row_to_check)
                 
                 if row_to_check == ass:
                     p += factor.iloc[j]['p']
+                    
             cps.append(p)
-            
         # Add to dataframe
         marginalized_cpt['p'] = cps
+        ## print(marginalized_cpt)
         return marginalized_cpt
     
     def factor_multiplication(self, factor_f, factor_g):
-  
+        
+        ## print(factor_f)
+        ## print(factor_g)
+        
         variables_factor_f = factor_f.columns.tolist()[:-1]
         variables_factor_g = factor_g.columns.tolist()[:-1]
 
         all_variables = np.unique(variables_factor_f + variables_factor_g)
+        ## print(all_variables)
                 
         table = list(itertools.product([False, True], repeat=len(all_variables))) 
         table_list = [list(ele) for ele in table]
-                
+        
+        ## print(table_list)
+        
         multiplication_factor = pd.DataFrame(table_list, columns = [all_variables])
-                        
+        
+        ## print(multiplication_factor)
+                
         products = []
         
         for ass in table:
             assignment = dict(zip(all_variables, ass))
+            
+            ## print(assignment)
             instantiation = pd.Series(assignment)
             
             # get compatible instanciation table from factor 1
             factor_f_compat = self.bn.get_compatible_instantiations_table(instantiation, factor_f)
             factor_g_compat = self.bn.get_compatible_instantiations_table(instantiation, factor_g)
             
+            ## print(factor_g_compat['p'].values)
+            ## print(factor_f_compat['p'].values)
+            
             product = factor_g_compat['p'].values[0] * factor_f_compat['p'].values[0]
             
+            #print('product', product) 
             products.append(product)
                
         multiplication_factor['p'] = products
@@ -233,17 +259,21 @@ class BNReasoner:
         n_assignments = len(summed_out_cpt)
         n_rows_cpt = len(cpt)
         
+        print(summed_out_cpt)
         # get values of the first row
         cps =[]
         X_instantiations = []
         
         # find max conditional probability for same assignments
         for i in range(n_assignments):
-            ass = [val for val in summed_out_cpt.iloc[i]]           
-            
+            ass = [val for val in summed_out_cpt.iloc[i]]
+            print('Assignment', ass)
+           
             p_max = -1
+            
             for j in range(n_rows_cpt):
                 row_to_check = [val for val in cpt_ext_f.iloc[j]]
+                print('cpt row', row_to_check)
                                 
                 if row_to_check == ass:
                     if p_max < cpt.iloc[j]['p']:
@@ -257,6 +287,7 @@ class BNReasoner:
         summed_out_cpt['p'] = cps
         summed_out_cpt['instantiation_x'] = X_instantiations
         
+        ## print(marginalized_cpt)
         return summed_out_cpt
     
     def ordering_MinDegreeHeuristic(self, X):
@@ -283,15 +314,31 @@ class BNReasoner:
         # get variable with min degree
         min_degree = min(x_degree, key=x_degree.get) # should this be able to deal with ties?
         
-        # remove from graph
+        # get min variable neighbors
+        neighbors_min_degree = [n for n in graph.neighbors(min_degree)]
+        combination_neighbors_min_degree = list(set(combinations(neighbors_min_degree, 2)))
         
-        # add an edge between neighbors
+        for i, pair in enumerate(combination_neighbors_min_degree):
+            
+            # if not connected, add edge
+            if (combination_neighbors_min_fill != []) and ((combination_neighbors_min_fill[i][0], combination_neighbors_min_fill[i][1]) 
+            and (combination_neighbors_min_fill[i][1], combination_neighbors_min_fill[i][0]) 
+            not in self.bn.get_interaction_graph().edges):
+                
+                print('EDGE WAS ADDED TO GRAPH')
+                
+                # add non-existent edge
+                self.bn.add_edge(pair)
+        
+        # remove node from graph (sum-out)
+        self.bn.del_var(min_degree)
+        
         return min_degree, full_order
         
         
     def ordering_MinFillHeuristic(self, X):
         '''Minimimum Fill Heuristic
-        For each node of set X, finds neighbors, and add to the count 
+        For each current node of set X, finds neighbors, and add to the count 
         if neighbors not already connected (no edges between neighbors)
         
         Args
@@ -308,19 +355,28 @@ class BNReasoner:
             
             # compute n edges between neighbors of X that are not connected already
             neighbors_x = [n for n in graph.neighbors(var)]
-            ## print(f'Neighbors of {var}', neighbors_x)
+            print(f'Neighbors of {var}', neighbors_x)
             
             # if not edges, add to count
-            for neighbor in neighbors_x :
-                ## print('Edge required between', (neighbor, var))
-                
-                if (var, neighbor) and (neighbor, var) not in self.bn.get_interaction_graph().edges:
-                    ## print('Edge not found', (neighbor, var))
-                    dict[var] +=1 
+            combination_neighbors = list(set(combinations(neighbors_x, 2)))
+            print(combination_neighbors)
+            
+            if combination_neighbors == []:
+                dict[var] += 0
+                                        
+            else:
+                for i, pair in enumerate(combination_neighbors):
+                    #print(combination_neighbors[i][0])
+                    #print(combination_neighbors[i][1])
+
+                    if (combination_neighbors[i][0], combination_neighbors[i][1]) and (combination_neighbors[i][1], combination_neighbors[i][0]) not in self.bn.get_interaction_graph().edges:
+                        print('Edge not found', (combination_neighbors[i][0], combination_neighbors[i][1]))
+                        dict[var] += 1 
                     
                 # else:
                     # print('Edge already exists', (neighbor, var))         
             
+        ## print(dict)  
         # build new df with only keys in set
         x_dict = {node: dict[node] for node in X}
         
@@ -333,25 +389,41 @@ class BNReasoner:
         # get minimum fill
         min_fill = min(dict, key=dict.get) # should this be able to deal with ties?
     
-        # add interactions
+        # add interactions (eges between neigbhors)
+        neighbors_min_fill = [n for n in graph.neighbors(min_fill)]
+        combination_neighbors_min_fill = list(set(combinations(neighbors_min_fill, 2)))
         
-        # remove node
+        # print('MIN FILL VARIABLE', min_fill)
+        for i, pair in enumerate(combination_neighbors_min_fill):
+            
+            if (combination_neighbors_min_fill != []) and ((combination_neighbors_min_fill[i][0], combination_neighbors_min_fill[i][1]) 
+            and (combination_neighbors_min_fill[i][1], combination_neighbors_min_fill[i][0]) 
+            not in self.bn.get_interaction_graph().edges):
+                
+                print('adding an edge based on min fill')
+                
+                # add non-existent edge
+                self.bn.add_edge(pair)
+        
+        # remove node (sum-out)
+        self.bn.del_var(min_fill)
         
         return min_fill, full_order
         
     def one_variable_elimination(self, x_target):
         '''Sum out one target variable with variable elimination
         Args 
-        X : list of variables where index = order for elimination -> 0, first to be eliminated
+        x_target : string of target variable name
         
-        returns : List of factors after the target variable has been eliminated.
+        returns : Factors after the target variable has been eliminated.
         '''
         # get random variable order
         # get variable order according to heuristic
         # first, full_order = self.ordering_MinFillHeuristic(X)
         
-        #all_factors = self.bn.get_all_cpts()
+        # reduce factors if probability = 0 
         
+        #all_factors = self.bn.get_all_cpts()
         all_variables = self.bn.get_all_variables()
         
         # get all factors that contain the target variable
@@ -392,6 +464,26 @@ class BNReasoner:
         self.bn.update_cpt(x_target, summed_out_factor)
     
         return self.bn.get_all_cpts()
+    
+    
+    def set_variable_elimination(self, x_target_set):
+        '''Sum out a set of variable with variable elimination
+        Args 
+        X : list of variables where index = order for elimination -> 0, first to be eliminated
+        
+        returns : List of factors after the variables have been eliminated.
+        '''            
+    
+        # remove variables outside of set from list ordering
+        for target in x_target_set:
+            self.one_variable_elimination(target)
+                    
+            
+        
+    
+
+# reduce factors
+# 
 
 ###########################################################################
 ############################### TESTING ###################################
@@ -432,10 +524,10 @@ cpt_factor3 = bayesian.bn.get_all_cpts()['dog-out']
 
 ################## Test min heuristics ###################
 #print(bayesian.ordering_MinDegreeHeuristic(['light-on', 'bowel-problem', 'dog-out']))
-# print(bayesian.ordering_MinFillHeuristic(['light-on', 'bowel-problem', 'dog-out']))
+print(bayesian.ordering_MinFillHeuristic(['light-on', 'bowel-problem', 'dog-out']))
 
 ################## Test variable elimination #####################
-print(bayesian.one_variable_elimination('dog-out'))
+# print(bayesian.one_variable_elimination('dog-out'))
 
 #print(bayesian.bn.get_interaction_graph().adj)
 #bayesian.find_observed_ancestors(['dog-out', 'family-out'])
