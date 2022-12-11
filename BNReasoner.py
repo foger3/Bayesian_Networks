@@ -41,21 +41,15 @@ class BNReasoner:
             Z = [Z]
         
         variables = X + Y + Z
-        ## print(variables)
         
         # 1. Delete every leaf nodes : that don't have children        
         self.del_leaf_nodes(variables)
         
         # 2. Delete all edges outgoing from Z
         ## find children
-        for evidence in Z :
-            ## print('evidence', evidence)
-            
+        for evidence in Z :            
             successors = self.bn.structure.successors(evidence)
             for successor in [c for c in successors]:
-                ## print('successor', successor)
-                
-                print(evidence, successor)
                 self.bn.del_edge((evidence, successor))
             
         self.del_leaf_nodes(variables)
@@ -73,9 +67,8 @@ class BNReasoner:
         ancestors = set() ## observed nodes and their ancestors
 
         while len(visit_nodes) > 0:
-            ## print('visited nodes', visit_nodes)
             next_node = visit_nodes.pop() 
-            ## print('next node', next_node)
+            
             ## add parents
             for parent in self.bn.structure.predecessors(next_node):
                 ancestors.add(parent)
@@ -178,67 +171,49 @@ class BNReasoner:
         n_assignments = len(marginalized_cpt)
         n_rows_cpt = len(factor)
         
-        print(marginalized_cpt)
         # get values of the first row
         cps =[]
         
         # sum conditional probability for same assignments
         for i in range(n_assignments):
             ass = [val for val in marginalized_cpt.iloc[i]]
-            print('Assignment', ass)
             
             p = 0
             for j in range(n_rows_cpt):
                 row_to_check = [val for val in cpt_ext_f.iloc[j]]
-                print('cpt row', row_to_check)
                 
                 if row_to_check == ass:
                     p += factor.iloc[j]['p']
-                    
             cps.append(p)
+            
         # Add to dataframe
         marginalized_cpt['p'] = cps
-        ## print(marginalized_cpt)
         return marginalized_cpt
     
     def factor_multiplication(self, factor_f, factor_g):
-        
-        ## print(factor_f)
-        ## print(factor_g)
-        
+  
         variables_factor_f = factor_f.columns.tolist()[:-1]
         variables_factor_g = factor_g.columns.tolist()[:-1]
 
         all_variables = np.unique(variables_factor_f + variables_factor_g)
-        ## print(all_variables)
                 
         table = list(itertools.product([False, True], repeat=len(all_variables))) 
         table_list = [list(ele) for ele in table]
-        
-        ## print(table_list)
-        
-        multiplication_factor = pd.DataFrame(table_list, columns = [all_variables])
-        
-        ## print(multiplication_factor)
                 
+        multiplication_factor = pd.DataFrame(table_list, columns = [all_variables])
+                        
         products = []
         
         for ass in table:
             assignment = dict(zip(all_variables, ass))
-            
-            ## print(assignment)
             instantiation = pd.Series(assignment)
             
             # get compatible instanciation table from factor 1
             factor_f_compat = self.bn.get_compatible_instantiations_table(instantiation, factor_f)
             factor_g_compat = self.bn.get_compatible_instantiations_table(instantiation, factor_g)
             
-            ## print(factor_g_compat['p'].values)
-            ## print(factor_f_compat['p'].values)
-            
             product = factor_g_compat['p'].values[0] * factor_f_compat['p'].values[0]
             
-            #print('product', product) 
             products.append(product)
                
         multiplication_factor['p'] = products
@@ -258,21 +233,17 @@ class BNReasoner:
         n_assignments = len(summed_out_cpt)
         n_rows_cpt = len(cpt)
         
-        print(summed_out_cpt)
         # get values of the first row
         cps =[]
         X_instantiations = []
         
         # find max conditional probability for same assignments
         for i in range(n_assignments):
-            ass = [val for val in summed_out_cpt.iloc[i]]
-            print('Assignment', ass)
-           
-            p_max = -1
+            ass = [val for val in summed_out_cpt.iloc[i]]           
             
+            p_max = -1
             for j in range(n_rows_cpt):
                 row_to_check = [val for val in cpt_ext_f.iloc[j]]
-                print('cpt row', row_to_check)
                                 
                 if row_to_check == ass:
                     if p_max < cpt.iloc[j]['p']:
@@ -286,7 +257,6 @@ class BNReasoner:
         summed_out_cpt['p'] = cps
         summed_out_cpt['instantiation_x'] = X_instantiations
         
-        ## print(marginalized_cpt)
         return summed_out_cpt
     
     def ordering_MinDegreeHeuristic(self, X):
@@ -351,7 +321,6 @@ class BNReasoner:
                 # else:
                     # print('Edge already exists', (neighbor, var))         
             
-        ## print(dict)  
         # build new df with only keys in set
         x_dict = {node: dict[node] for node in X}
         
@@ -423,40 +392,6 @@ class BNReasoner:
         self.bn.update_cpt(x_target, summed_out_factor)
     
         return self.bn.get_all_cpts()
-    
-    
-        # remove variables outside of set from list ordering
-        
-        # for each variable in elimination ordering
-        
-            # find factors/fonctions with variable
-            
-            # multiply those functions
-            
-        #
-        
-        # regroup factors 
-        
-        # compute joint prob 
-        #for factor in factors :
-            
-        #self.factor_multiplication(factor_f, factor_g)
-        
-        # which we eliminate first
-        #var_eliminate = self.heuristic() 
-        #if var_eliminate == None:
-        #    break
-
-        #self.marginalization_factor(var_eliminate)
-            
-        # factor multiplication over factors
-        #if len(self.list_of_factors) > 1:
-        #    self.factor_multiplication(factor_f, factor_g)
-            
-    
-
-# reduce factors
-# 
 
 ###########################################################################
 ############################### TESTING ###################################
