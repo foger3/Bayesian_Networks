@@ -163,7 +163,7 @@ class BNReasoner:
                 
     
     def check_independance(self, X, Y, Z):
-        return self.check_dseparation(X, Y, Z) 
+        return self.check_set_dseparation(X, Y, Z) 
 
     def marginalization_factor(self, factor, x):
         """ This method marginalizes out a factor 
