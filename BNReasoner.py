@@ -21,46 +21,47 @@ class BNReasoner:
             self.bn.load_from_bifxml(net)
         else:
             self.bn = net
-            self.heuristic = 'random'
         
         self.cpt = copy.deepcopy(self.bn.get_all_cpts())
         self.graph = self.bn.get_interaction_graph()
         self.factors = copy.deepcopy(self.bn.get_all_cpts())
         
-    # TODO: This is where your methods should go
-    def del_leaf_nodes(self, variables):
-        '''Delete leaf nodes of BN'''
-        all_variables = set(self.bn.get_all_variables()) - set(variables)
+    # Methods 
+    def del_leaf_nodes(self, Q, e):
+        '''Delete leaf nodes of BN
+        Args
+        Q : list of query variables
+        '''
+        vars_q_e = Q + list(e.keys())
+        all_variables = set(self.factors.keys()).difference(set(vars_q_e)) # vars not in e and Q
+        print(all_variables)
+        
+        # if no children, delete
         for variable in all_variables:
             successors = [c for c in self.bn.structure.successors(variable)]
-            if len(successors) == 0 :
+            if len(successors) == 0 : 
+
                 # Delete leaf node
                 self.bn.del_var(variable)
+                
+                # Delete factor 
+                del self.factors[variable]
+                
+        #print(self.factors)
         
-    def apply_pruning(self, X, Y, Z):
+    def apply_pruning(self, Q, e):
         '''Deletes every leaf node 𝑊 ∉𝑋∪𝑌∪𝑍,
         Deletes all edges outgoing from nodes in 𝑍
         Performs both rules iteratively until they cannot be applied anymore'''
-                
-        if type(X) is not list:
-            X = [X]
-        if type(Y) is not list:
-            Y = [Y]
-        if type(Z) is not list:
-            Z = [Z]
-            
-        # reduce factors?
-        #reduce_factor(instantiation: pd.Series, cpt: pd.DataFrame)
         
-        variables = X + Y + Z
         ## print(variables)
         
-        # 1. Delete every leaf nodes : that don't have children        
-        self.del_leaf_nodes(variables)
+        # 1. Delete every leaf nodes not in Q and e that don't have children        
+        self.del_leaf_nodes(Q, e)
         
         # 2. Delete all edges outgoing from Z
         ## find children
-        for evidence in Z :
+        for evidence in e :
             ## print('evidence', evidence)
             
             successors = self.bn.structure.successors(evidence)
@@ -69,8 +70,26 @@ class BNReasoner:
                 
                 print(evidence, successor)
                 self.bn.del_edge((evidence, successor))
+                
+        # update cpt table         
+        # get factors containing evidence and sum-out w.r. e
+        all_variables = list(self.factors.keys())
+        
+        for evidence in e:
+            for variable in all_variables:
+                #print(variable)
+           
+                # get factors containing evidence
+                factor_var = self.factors[variable]
+                variables_in_factor = list(factor_var.columns.map(''.join))
             
-        self.del_leaf_nodes(variables)
+                if evidence in variables_in_factor and variable != evidence:
+                    #print(' evidence', evidence)
+                    #print('variable', variable )
+                    #print(self.factors[variable])
+                    self.factors[variable] = self.marginalization_factor(self.factors[variable], evidence)         
+            
+        self.del_leaf_nodes(Q, e)
     
     
     def find_ancestors(self, variables):
@@ -185,9 +204,10 @@ class BNReasoner:
         """
         #print(self.bn.get_all_variables())
         #factor = self.bn.get_cpt(nfactor)
+        print(factor)
         
-        #if x not in list(factor.columns):
-        #    return factor
+        if x not in list(factor.columns):
+            return factor
         
         cpt_ext_f = factor.drop([x, "p"], axis=1)
         marginalized_cpt = cpt_ext_f.drop_duplicates().reset_index(drop= True)
@@ -277,7 +297,7 @@ class BNReasoner:
             ## print(assignment)
             instantiation = pd.Series(assignment)
             
-            print('INSTANCIATION', instantiation)
+            #print('INSTANTIATION \n', instantiation)
             
             # get compatible instanciation table for factor 1
             factor_f_compat = self.bn.get_compatible_instantiations_table(instantiation, factor_f)
@@ -299,7 +319,7 @@ class BNReasoner:
         
         # add an edge in the interaction graph between neighbors if non-existent         
         #self.graph.add_edge(factor_f, factor_g)
-        
+        #print('Multiplied factors', multiplication_factor)
         return multiplication_factor
             
     def maxing_out(self, factor, x):
@@ -345,9 +365,11 @@ class BNReasoner:
             
         # Add to dataframe
         maxed_out_cpt['p'] = cps
-        maxed_out_cpt['instantiation_x'] = X_instantiations
+        #maxed_out_cpt['instantiation_x'] = X_instantiations
         
         ## print(marginalized_cpt)
+        #print(maxed_out_cpt)
+        #print(instantiation_with_map)
         return maxed_out_cpt, instantiation_with_map
     
     def ordering_MinDegreeHeuristic(self, X):
@@ -453,12 +475,12 @@ class BNReasoner:
             factor_var = self.factors[variable]
             variables_in_factor = list(factor_var.columns.map(''.join))
             
-            print('variable in factor', variables_in_factor)
+            #print('variable in factor', variables_in_factor)
             
             if x_target in variables_in_factor:
                 variables_product.append(variable)
                             
-        # print('FACTORS TO BE CONSIDERED', variables_product)       
+        print('FACTORS TO MULTIPLY', variables_product)       
         
         # compute the product of all factors containing the target variable        
         if len(variables_product) > 1:
@@ -610,10 +632,19 @@ class BNReasoner:
         
     def MEP(self, e, heuristic):
         '''Get instantiation for all variables given the evidence'''
+        # network pruning 
+        Q = list(self.factors.keys())
+        self.apply_pruning(Q, e)
         
-        # network pruning
+        # reduce all factors with respect to e
+        for variable in (self.factors.keys()):
+            ## print(variable)
+            cpt_var = self.factors[variable]
+            reduced_cpt = self.bn.get_compatible_instantiations_table(pd.Series(e), cpt_var)
+            self.factors[variable] = reduced_cpt
     
-        all_variables = list(self.bn.get_all_variables())
+        all_variables = list(self.factors.keys())
+        map_instantiation = {}
         
         # get all variables not e
         not_e_variables = list(set(all_variables).difference(set(e)))
@@ -638,14 +669,14 @@ class BNReasoner:
             # max-out variable
             variables_product = []
             
-            for variable in all_variables:
+            for variable in list(self.factors.keys()):
                 # get factor
                 factor_var = self.factors[variable]
                 
                 print(factor_var)
                 variables_in_factor = list(factor_var.columns.map(''.join))
             
-                print('variable in factor', variables_in_factor)
+                #print('variable in factor', variables_in_factor)
             
                 if min_var in variables_in_factor:
                     variables_product.append(variable)
@@ -658,7 +689,7 @@ class BNReasoner:
             
             else:
                 if variables_product == []:
-                    print('Nothing to reduce with respect to target variable')
+                    print('Nothing to max-out with respect to target variable')
                     return self.factors
             
                 else : # only one factor to consider
@@ -669,8 +700,14 @@ class BNReasoner:
                     new_factor = self.factors[variables_product[i]]
                     product_factor = self.factor_multiplication(product_factor, new_factor)    
             
-            maxed_out_factor = self.maxing_out(product_factor, min_var)
+            print('PRODUCT FACTOR', product_factor)  
+            maxed_out_factor, instantiation_with_map = self.maxing_out(product_factor, min_var)
+            map_instantiation[min_var]= instantiation_with_map
             
+            print('MAXED-OUT', maxed_out_factor)
+            print('MEP INSTANTIATION', instantiation_with_map)
+            
+            # update factors
             for variable in variables_product:
                 del self.factors[variable]
 
@@ -680,7 +717,9 @@ class BNReasoner:
             # update evidence left to sum-out
             not_e_variables.remove(min_var)
         
-        print(self.factor)
+        print(self.factors)
+        
+        return map_instantiation, maxed_out_factor['p']
 
 ###########################################################################
 ############################### TESTING ###################################
@@ -749,24 +788,9 @@ cpt_factor1 = bayesian.bn.get_all_cpts()['hear-bark']
 #print(bayesian.bn.get_compatible_instantiations_table(pd.Series({'fam-out': False}),bayesian.bn.get_all_cpts()['fam-out']))
 #print(bayesian.bn.get_all_cpts())
 
-print(bayesian.MEP({'light-on': False}, 'min_fill'))
+#print(bayesian.MEP({'light-on': False}, 'min_fill'))
+#print(bayesian.bn.get_all_cpts())
+#bayesian.bn.del_edge(('family-out', 'light-on'))
+#print(bayesian.bn.get_all_cpts())
 
-
- # get min variable neighbors
-'''neighbors_min_degree = [n for n in graph.neighbors(min_degree)]
-        combination_neighbors_min_degree = list(set(combinations(neighbors_min_degree, 2)))
-        
-        for i, pair in enumerate(combination_neighbors_min_degree):
-            
-            # if not connected, add edge
-            if (combination_neighbors_min_fill != []) and ((combination_neighbors_min_fill[i][0], combination_neighbors_min_fill[i][1]) 
-            and (combination_neighbors_min_fill[i][1], combination_neighbors_min_fill[i][0]) 
-            not in self.bn.get_interaction_graph().edges):
-                
-                print('EDGE WAS ADDED TO GRAPH')
-                
-                # add non-existent edge
-                self.bn.add_edge(pair)
-        
-        # remove node from graph (sum-out)
-        self.bn.del_var(min_degree)'''
+bayesian.MEP({'light-on': False}, 'min_fill')
