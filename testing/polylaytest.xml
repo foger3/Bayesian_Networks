@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="US-ASCII"?>
+<!--
+Bayesian network in XMLBIF v0.3 (BayesNet Interchange Format)
+Produced by BNJ 3.0 (http://bndev.sourceforge.net/
+-->
+		<!-- DTD for the XMLBIF 0.3 format -->
+<!DOCTYPE BIF [
+<!ELEMENT BIF ( NETWORK )*>
+<!ATTLIST BIF VERSION CDATA #REQUIRED>
+<!ELEMENT NETWORK ( NAME, ( PROPERTY | VARIABLE | DEFINITION )* )>
+<!ELEMENT NAME (#PCDATA)>
+<!ELEMENT VARIABLE ( NAME, ( OUTCOME |  PROPERTY )* ) >
+	<!ATTLIST VARIABLE TYPE (nature|decision|utility) "nature">
+<!ELEMENT OUTCOME (#PCDATA)>
+<!ELEMENT DEFINITION ( FOR | GIVEN | TABLE | PROPERTY )* >
+<!ELEMENT FOR (#PCDATA)>
+<!ELEMENT GIVEN (#PCDATA)>
+<!ELEMENT TABLE (#PCDATA)>
+<!ELEMENT PROPERTY (#PCDATA)>
+]>
+<BIF VERSION="0.3">
+<NETWORK>
+<NAME>bn</NAME>
+	<VARIABLE TYPE="nature">
+		<NAME>New Node0</NAME>
+		<OUTCOME>D</OUTCOME>
+		<PROPERTY>position = (397,93)</PROPERTY>
+	</VARIABLE>
+	<VARIABLE TYPE="nature">
+		<NAME>New Node1</NAME>
+		<OUTCOME>D</OUTCOME>
+		<PROPERTY>position = (239,292)</PROPERTY>
+	</VARIABLE>
+	<VARIABLE TYPE="nature">
+		<NAME>New Node2</NAME>
+		<OUTCOME>D</OUTCOME>
+		<PROPERTY>position = (627,284)</PROPERTY>
+	</VARIABLE>
+	<VARIABLE TYPE="nature">
+		<NAME>New Node3</NAME>
+		<OUTCOME>D</OUTCOME>
+		<PROPERTY>position = (31,483)</PROPERTY>
+	</VARIABLE>
+	<VARIABLE TYPE="nature">
+		<NAME>New Node4</NAME>
+		<OUTCOME>D</OUTCOME>
+		<PROPERTY>position = (350,484)</PROPERTY>
+	</VARIABLE>
+	<VARIABLE TYPE="nature">
+		<NAME>New Node5</NAME>
+		<OUTCOME>D</OUTCOME>
+		<PROPERTY>position = (549,448)</PROPERTY>
+	</VARIABLE>
+	<VARIABLE TYPE="nature">
+		<NAME>New Node6</NAME>
+		<OUTCOME>D</OUTCOME>
+		<PROPERTY>position = (792,460)</PROPERTY>
+	</VARIABLE>
+	<DEFINITION>
+		<FOR>New Node0</FOR>
+		<TABLE>0 		</TABLE>	</DEFINITION>	<DEFINITION>
+		<FOR>New Node1</FOR>
+		<GIVEN>New Node0</GIVEN>
+		<TABLE>0 		</TABLE>	</DEFINITION>	<DEFINITION>
+		<FOR>New Node2</FOR>
+		<GIVEN>New Node0</GIVEN>
+		<TABLE>0 		</TABLE>	</DEFINITION>	<DEFINITION>
+		<FOR>New Node3</FOR>
+		<GIVEN>New Node1</GIVEN>
+		<TABLE>0 		</TABLE>	</DEFINITION>	<DEFINITION>
+		<FOR>New Node4</FOR>
+		<GIVEN>New Node1</GIVEN>
+		<TABLE>0 		</TABLE>	</DEFINITION>	<DEFINITION>
+		<FOR>New Node5</FOR>
+		<GIVEN>New Node2</GIVEN>
+		<TABLE>0 		</TABLE>	</DEFINITION>	<DEFINITION>
+		<FOR>New Node6</FOR>
+		<GIVEN>New Node2</GIVEN>
+		<TABLE>0 		</TABLE>	</DEFINITION></NETWORK>
+</BIF>
